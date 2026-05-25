@@ -1,3 +1,4 @@
+import sqlite3
 """
 Все хендлеры Telegram бота.
 """
@@ -470,3 +471,112 @@ async def manual_confirm(message: Message, bot: Bot):
         parse_mode="HTML"
     )
     await message.answer(f"✅ Подписка выдана пользователю {payment['user_id']}")
+
+
+# ── Доп. админ команды ────────────────────────────────────────
+
+@router.message(Command("users"))
+async def cmd_users(message: Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    conn = sqlite3.connect("vpn_bot.db")
+    c = conn.cursor()
+    c.execute("SELECT user_id, username, created_at FROM users ORDER BY created_at DESC LIMIT 10")
+    rows = c.fetchall()
+    conn.close()
+    if not rows:
+        await message.answer("Пользователей пока нет.")
+        return
+    lines = []
+    for uid, uname, created in rows:
+        uname_str = f"@{uname}" if uname else f"id:{uid}"
+        lines.append(f"• {uname_str} — {created[:10]}")
+    await message.answer("👥 <b>Последние 10 пользователей:</b>\n\n" + "\n".join(lines), parse_mode="HTML")
+    return
+
+
+@router.message(Command("sub"))
+async def cmd_sub(message: Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    parts = message.text.split()
+    if len(parts) < 2:
+        await message.answer("Использование: /sub USER_ID")
+        return
+    try:
+        uid = int(parts[1])
+    except ValueError:
+        await message.answer("❌ Неверный USER_ID")
+        return
+    sub = get_active_subscription(uid)
+    if not sub:
+        await message.answer(f"❌ У пользователя {uid} нет активной подписки.")
+        return
+    plan = PLANS.get(sub["plan"], {})
+    await message.answer(
+        f"👤 Пользователь: <b>{uid}</b>\n"
+        f"📦 Тариф: <b>{plan.get('name', sub['plan'])}</b>\n"
+        f"📅 До: <b>{sub['expires_at'][:10]}</b>\n"
+        f"🔑 Ключ:\n<code>{sub['vpn_key']}</code>",
+        parse_mode="HTML"
+    )
+
+
+@router.message(Command("ban"))
+async def cmd_ban(message: Message, bot: Bot):
+    if message.from_user.id != ADMIN_ID:
+        return
+    parts = message.text.split()
+    if len(parts) < 2:
+        await message.answer("Использование: /ban USER_ID")
+        return
+    try:
+        uid = int(parts[1])
+    except ValueError:
+        await message.answer("❌ Неверный USER_ID")
+        return
+    conn = sqlite3.connect("vpn_bot.db")
+    conn.execute("DELETE FROM users WHERE user_id=?", (uid,))
+    conn.execute("DELETE FROM subscriptions WHERE user_id=?", (uid,))
+    conn.commit()
+    conn.close()
+    try:
+        await bot.send_message(uid, "❌ Ваш аккаунт заблокирован. Обратитесь в поддержку.")
+    except Exception:
+        pass
+    await message.answer(f"✅ Пользователь {uid} заблокирован и удалён.")
+
+
+@router.message(Command("addbalance"))
+async def cmd_addbalance(message: Message, bot: Bot):
+    if message.from_user.id != ADMIN_ID:
+        return
+    parts = message.text.split()
+    if len(parts) < 3:
+        await message.answer("Использование: /addbalance USER_ID СУММА")
+        return
+    try:
+        uid = int(parts[1])
+        amount = float(parts[2])
+    except ValueError:
+        await message.answer("❌ Неверные параметры")
+        return
+    conn = sqlite3.connect("vpn_bot.db")
+    conn.execute("UPDATE users SET balance = balance + ? WHERE user_id=?", (amount, uid))
+    conn.commit()
+    conn.close()
+    try:
+        await bot.send_message(uid, f"💰 Вам начислено <b>{amount:.0f}₽</b> на баланс!", parse_mode="HTML")
+    except Exception:
+        pass
+    await message.answer(f"✅ Пользователю {uid} начислено {amount:.0f}₽")
+
+
+@router.message(Command("notify"))
+async def cmd_notify(message: Message, bot: Bot):
+    if message.from_user.id != ADMIN_ID:
+        return
+    from scheduler import send_expiry_notifications
+    await message.answer("⏳ Запускаю проверку истекающих подписок...")
+    await send_expiry_notifications(bot)
+    await message.answer("✅ Проверка завершена!")

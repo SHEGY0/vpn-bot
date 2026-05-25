@@ -402,7 +402,7 @@ async def support(message: Message):
     await message.answer(
         "💬 <b>Поддержка</b>\n\n"
         "Если у вас возникли проблемы — напишите нам:\n"
-        "👉 @ВАШ_ЮЗЕРНЕЙМ_ПОДДЕРЖКИ\n\n"
+        "👉 @pl0pa\n\n"
         "Обычно отвечаем в течение 1 часа.",
         parse_mode="HTML",
         reply_markup=main_menu()

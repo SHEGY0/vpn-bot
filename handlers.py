@@ -20,7 +20,7 @@ from database import (
     get_balance, deduct_balance
 )
 from marzban import create_vpn_user
-from payments import create_crypto_invoice, create_yookassa_payment, check_crypto_invoice
+from payments import create_crypto_invoice, create_yookassa_payment, check_crypto_invoice, create_freekassa_payment
 
 REFERRAL_PERCENT = 0.30  # 30%
 
@@ -54,7 +54,7 @@ def payment_keyboard(plan_key: str, balance: float = 0) -> InlineKeyboardMarkup:
     plan = PLANS[plan_key]
     buttons = [
         [InlineKeyboardButton(text="💎 Крипта (USDT)", callback_data=f"pay:crypto:{plan_key}")],
-        [InlineKeyboardButton(text="💳 Рубли (ЮKassa)", callback_data=f"pay:rub:{plan_key}")],
+        [InlineKeyboardButton(text="💳 Рубли (Freekassa)", callback_data=f"pay:fk:{plan_key}")],
     ]
     if balance >= plan["price_rub"]:
         buttons.append([InlineKeyboardButton(

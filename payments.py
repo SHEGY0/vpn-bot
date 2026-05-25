@@ -72,3 +72,39 @@ async def create_yookassa_payment(plan_key: str, user_id: int) -> dict:
         "invoice_id": f"YOOKASSA_STUB_{user_id}_{plan_key}",
         "pay_url":    "https://yookassa.ru/STUB_PAYMENT_URL",
     }
+
+
+# ── Freekassa ───────────────────────────────────────────────
+
+import hashlib
+import os
+
+FREEKASSA_SHOP_ID = os.environ.get("FREEKASSA_SHOP_ID", "")
+FREEKASSA_SECRET1 = os.environ.get("FREEKASSA_SECRET1", "")
+
+
+async def create_freekassa_payment(plan_key: str, user_id: int) -> dict:
+    """
+    Создаёт ссылку для оплаты через Freekassa.
+    Возвращает: {"invoice_id": str, "pay_url": str}
+    """
+    from config import PLANS
+    plan = PLANS[plan_key]
+    amount = plan["price_rub"]
+    invoice_id = f"FK_{user_id}_{plan_key}_{int(__import__('time').time())}"
+
+    sign = hashlib.md5(
+        f"{FREEKASSA_SHOP_ID}:{amount}:{FREEKASSA_SECRET1}:{invoice_id}".encode()
+    ).hexdigest()
+
+    pay_url = (
+        f"https://pay.freekassa.com/"
+        f"?m={FREEKASSA_SHOP_ID}"
+        f"&oa={amount}"
+        f"&o={invoice_id}"
+        f"&s={sign}"
+        f"&currency=RUB"
+        f"&lang=ru"
+    )
+
+    return {"invoice_id": invoice_id, "pay_url": pay_url}

@@ -580,3 +580,59 @@ async def cmd_notify(message: Message, bot: Bot):
     await message.answer("⏳ Запускаю проверку истекающих подписок...")
     await send_expiry_notifications(bot)
     await message.answer("✅ Проверка завершена!")
+
+
+@router.message(Command("givekey"))
+async def cmd_givekey(message: Message, bot: Bot):
+    """
+    Выдать ключ пользователю бесплатно.
+    Использование: /givekey USER_ID ПЛАН
+    Планы: 1m / 3m / 6m
+    Пример: /givekey 6477447974 1m
+    """
+    if message.from_user.id != ADMIN_ID:
+        return
+    parts = message.text.split()
+    if len(parts) < 3:
+        await message.answer(
+            "Использование: /givekey USER_ID ПЛАН\n"
+            "Планы: 1m / 3m / 6m\n"
+            "Пример: /givekey 6477447974 1m"
+        )
+        return
+    try:
+        uid = int(parts[1])
+        plan_key = parts[2]
+    except ValueError:
+        await message.answer("❌ Неверные параметры")
+        return
+    if plan_key not in PLANS:
+        await message.answer(f"❌ Неверный тариф. Доступны: {', '.join(PLANS.keys())}")
+        return
+
+    plan = PLANS[plan_key]
+    vpn = await create_vpn_user(uid, plan["days"])
+    save_subscription(
+        user_id=uid,
+        plan=plan_key,
+        days=plan["days"],
+        vpn_key=vpn["vpn_key"],
+        sub_link=vpn["sub_link"],
+        expires_at=vpn["expires_at"],
+        paid_rub=0,
+    )
+    try:
+        await bot.send_message(
+            uid,
+            f"🎁 <b>Вам выдан бесплатный VPN!</b>\n\n"
+            f"📦 Тариф: <b>{plan['name']}</b>\n"
+            f"📅 Действует до: <b>{vpn['expires_at'][:10]}</b>\n\n"
+            f"🔑 <b>Ваш ключ:</b>\n<code>{vpn['vpn_key']}</code>\n\n"
+            f"🔗 <b>Subscription link:</b>\n<code>{vpn['sub_link']}</code>\n\n"
+            "📲 Нажмите «Инструкция» чтобы узнать как подключиться.",
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await message.answer(f"⚠️ Не удалось отправить сообщение пользователю: {e}")
+        return
+    await message.answer(f"✅ Ключ на {plan['name']} выдан пользователю {uid}")

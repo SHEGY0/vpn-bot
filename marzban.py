@@ -10,7 +10,7 @@ _token: str | None = None
 
 async def _get_token() -> str:
     global _token
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         r = await client.post(f"{MARZBAN_URL}/api/admin/token",
             data={"username": MARZBAN_USER, "password": MARZBAN_PASS})
         _token = r.json()["access_token"]
@@ -21,7 +21,7 @@ async def create_vpn_user(telegram_id: int, days: int) -> dict:
     headers = {"Authorization": f"Bearer {token}"}
     expire_ts = int((datetime.now() + timedelta(days=days)).timestamp())
     username = f"tg_{telegram_id}_{int(datetime.now().timestamp())}"
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         r = await client.post(f"{MARZBAN_URL}/api/user", headers=headers, json={
             "username": username,
             "proxies": {"vless": {"flow": "xtls-rprx-vision"}},
@@ -39,5 +39,5 @@ async def create_vpn_user(telegram_id: int, days: int) -> dict:
 async def delete_vpn_user(username: str):
     token = await _get_token()
     headers = {"Authorization": f"Bearer {token}"}
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         await client.delete(f"{MARZBAN_URL}/api/user/{username}", headers=headers)
